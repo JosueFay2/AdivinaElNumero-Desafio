@@ -1,121 +1,318 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await Hive.openBox('historial');
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark(),
+      home: const HomePage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class Nivel {
+  final String nombre;
+  final int maxNumero;
+  final int intentos;
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  Nivel(this.nombre, this.maxNumero, this.intentos);
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+final niveles = [
+  Nivel("Fácil", 10, 5),
+  Nivel("Medio", 20, 8),
+  Nivel("Avanzado", 100, 15),
+  Nivel("Extremo", 1000, 25),
+];
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final box = Hive.box('historial');
+
+  final controller = TextEditingController();
+
+  double nivelIndex = 0;
+
+  int numeroSecreto = 0;
+  int intentosRestantes = 0;
+
+  List<int> mayores = [];
+  List<int> menores = [];
+
+  List<Map<String, dynamic>> historial = [];
+
+  void cargarHistorial() {
+    final data = box.values.toList();
+
+    historial = data.map((e) {
+      return {"numero": e["numero"], "estado": e["estado"]};
+    }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    cargarHistorial();
+    iniciarJuego(niveles[0]);
+  }
+
+  void iniciarJuego(Nivel nivel) {
+    final random = Random();
+
+    numeroSecreto = random.nextInt(nivel.maxNumero) + 1;
+    intentosRestantes = nivel.intentos;
+
+    mayores.clear();
+    menores.clear();
+
+    setState(() {});
+  }
+
+  void validarIntento(Nivel nivel) {
+    final input = int.tryParse(controller.text);
+
+    if (input == null) return;
+
+    if (input < 1 || input > nivel.maxNumero) {
+      Fluttertoast.showToast(
+        msg: "Fuera de rango (1 - ${nivel.maxNumero})",
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    if (input == numeroSecreto) {
+      historial.add({"numero": input, "estado": "win"});
+      box.add({"numero": input, "estado": "win"});
+
+      Fluttertoast.showToast(
+        msg: "¡Winner Winner Chicken Dinner!",
+        backgroundColor: Colors.greenAccent,
+      );
+
+      controller.clear();
+      iniciarJuego(niveles[nivelIndex.toInt()]);
+      cargarHistorial();
+      setState(() {});
+
+      return;
+    }
+
+    if (input < numeroSecreto) {
+      intentosRestantes--;
+      menores.add(input);
+    } else {
+      intentosRestantes--;
+      mayores.add(input);
+    }
+
+    if (intentosRestantes <= 0) {
+      historial.add({"numero": numeroSecreto, "estado": "lose"});
+      box.add({"numero": numeroSecreto, "estado": "lose"});
+      Fluttertoast.showToast(
+        msg: "Perdiste El Número era: $numeroSecreto",
+        backgroundColor: Colors.red,
+      );
+      cargarHistorial();
+      iniciarJuego(niveles[nivelIndex.toInt()]);
+    }
+
+    controller.clear();
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    final nivelActual = niveles[nivelIndex.toInt()];
+
     return Scaffold(
+      backgroundColor: const Color(0xFF2B2B2B),
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text("Adivina el Numero"),
+        centerTitle: true,
+        backgroundColor: Colors.black54,
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
           children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    onSubmitted: (_) => validarIntento(nivelActual),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: "Número",
+                      labelStyle: const TextStyle(color: Colors.white),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                          color: Colors.white,
+                          width: 1.5,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                          color: Colors.blue,
+                          width: 2,
+                        ),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      hintText: "Ingresa un número",
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.4),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Column(
+                  children: [
+                    const Text("Intentos"),
+                    Text(
+                      "$intentosRestantes",
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            SizedBox(
+              height: 250,
+              child: Row(
+                children: [
+                  _buildBox("Mayor que", mayores),
+                  const SizedBox(width: 10),
+                  _buildBox("Menor que", menores),
+                  const SizedBox(width: 10),
+                  _buildHistorial(),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            Column(
+              children: [
+                Text(nivelActual.nombre),
+                Slider(
+                  activeColor: Colors.blueAccent,
+                  thumbColor: Colors.blueAccent,
+                  value: nivelIndex,
+                  min: 0,
+                  max: 3,
+                  divisions: 3,
+                  label: nivelActual.nombre,
+                  onChanged: (value) {
+                    setState(() {
+                      controller.clear();
+                      nivelIndex = value;
+                      iniciarJuego(niveles[value.toInt()]);
+                    });
+                  },
+                ),
+                Text("1 - ${nivelActual.maxNumero}"),
+              ],
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _buildBox(String title, List<int> items) {
+    return Expanded(
+      child: Container(
+        height: 250,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.white),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Text(title),
+            const SizedBox(height: 10),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(children: items.map((e) => Text("$e")).toList()),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistorial() {
+    return Expanded(
+      child: Container(
+        height: 250,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.white),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Expanded(
+          child: Column(
+            children: [
+              const Text("Historial"),
+              const SizedBox(height: 10),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: historial.map((e) {
+                      Color color;
+
+                      switch (e["estado"]) {
+                        case "win":
+                          color = Colors.green;
+                          break;
+                        case "lose":
+                          color = Colors.red;
+                          break;
+                        default:
+                          color = Colors.red;
+                      }
+
+                      return Text(
+                        "${e["numero"]}",
+                        style: TextStyle(color: color),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
