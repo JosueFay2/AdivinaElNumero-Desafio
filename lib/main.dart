@@ -261,8 +261,11 @@ class _HomePageState extends State<HomePage> {
             Text(title),
             const SizedBox(height: 10),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(children: items.map((e) => Text("$e")).toList()),
+              child: ListView.builder(
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  return Center(child: Text("${items[index]}"));
+                },
               ),
             ),
           ],
@@ -286,28 +289,22 @@ class _HomePageState extends State<HomePage> {
               const Text("Historial"),
               const SizedBox(height: 10),
               Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: historial.map((e) {
-                      Color color;
+                child: ListView.builder(
+                  itemCount: historial.length,
+                  itemBuilder: (context, index) {
+                    final e = historial[index];
 
-                      switch (e["estado"]) {
-                        case "win":
-                          color = Colors.green;
-                          break;
-                        case "lose":
-                          color = Colors.red;
-                          break;
-                        default:
-                          color = Colors.red;
-                      }
+                    Color color = e["estado"] == "win"
+                        ? Colors.green
+                        : Colors.red;
 
-                      return Text(
+                    return Center(
+                      child: Text(
                         "${e["numero"]}",
                         style: TextStyle(color: color),
-                      );
-                    }).toList(),
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
